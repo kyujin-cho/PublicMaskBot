@@ -52,14 +52,13 @@ async def send_welcome(message: types.Message):
 async def start_lookup(message: types.Message):
     response = ''
     m_split = message.text.strip().split(' ')
-    print(m_split)
     if len(m_split) == 1:
         range_ = 500
     else:
         try:
             range_ = t.ToInt(gte=1, lte=5000).check(m_split[1].strip())
         except t.DataError as e:
-            print(e)
+            logging.error(e)
             range_ = 500
             response = '반경이 너무 크거나 작아요. 기본값인 500미터로 고정할게요.\n'
     response += '이 메세지의 답변 메세지로 현재 위치를 보내주세요.'
@@ -69,8 +68,6 @@ async def start_lookup(message: types.Message):
 @dp.message_handler(content_types=ContentTypes.LOCATION)
 async def get_location(message: types.Message):
     rr_mid = None
-    print(store_range_info)
-    print(message.reply_to_message)
     if message.reply_to_message is not None and message.reply_to_message.message_id in store_range_info.keys():
         rr_mid = message.reply_to_message.message_id
         m = store_range_info[rr_mid]
@@ -102,7 +99,6 @@ async def get_location(message: types.Message):
                         abstract = ''
                     
                     reply_tmp = f'{store_type_desc[store["type"]]} [{store["name"]} ({abstract})](https://map.kakao.com/?q={address} {store["name"]}): '
-                    print(store)
                     if 'remain_stat' not in store.keys() or store['remain_stat'] is None:
                         reply_tmp += '❌ 정보 미제공\n'
                         continue
