@@ -1,5 +1,7 @@
 # Telegram Public Mask Finder Bot
 
+**Bot Username**: `@public_mask_bot`
+
 ## Introduction
 
 Provides information of S. Korea's Public Mask sale status.
