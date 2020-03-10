@@ -7,9 +7,12 @@ from urllib.parse import urlencode
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ContentTypes
 import aiohttp
+from dotenv import load_dotenv
 import trafaret as t
 
-BOT_TOKEN = os.environ['BOT_TOKEN']
+load_dotenv(verbose=True)
+
+BOT_TOKEN = os.getenv('BOT_TOKEN')
 MASK_API = 'https://8oi9s0nnth.apigw.ntruss.com/corona19-masks/v1'
 
 logging.basicConfig(level=logging.INFO)
@@ -108,4 +111,7 @@ async def get_location(message: types.Message):
         del store_range_info[rr_mid]
 
 if __name__ == '__main__':
+    if BOT_TOKEN is None:
+        print('Bot Token env not provided!')
+        exit(-1)
     executor.start_polling(dp, skip_updates=True)

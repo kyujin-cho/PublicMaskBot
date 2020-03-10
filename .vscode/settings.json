@@ -1,0 +1,6 @@
+{
+    "python.pythonPath": "/Users/kyujin/.pyenv/versions/venv-public-mask-bot/bin/python",
+    "python.linting.pylintEnabled": false,
+    "python.linting.mypyEnabled": true,
+    "python.linting.enabled": true
+}
