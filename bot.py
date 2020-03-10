@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import re
@@ -61,7 +62,7 @@ async def start_lookup(message: types.Message):
             print(e)
             range_ = 500
             response = '반경이 너무 크거나 작아요. 기본값인 500미터로 고정할게요.\n'
-        response += '이 메세지의 답변 메세지로 현재 위치를 보내주세요.'
+    response += '이 메세지의 답변 메세지로 현재 위치를 보내주세요.'
     sent_message = await bot.send_message(message.chat.id, response, reply_to_message_id=message.message_id)
     store_range_info[sent_message.message_id] = range_
 
@@ -85,31 +86,38 @@ async def get_location(message: types.Message):
         'lng': str(location.longitude),
         'm': str(m)
     }
-    async with aiohttp.ClientSession() as sess:
-        async with sess.get(f'{MASK_API}/storesByGeo/json', params=body) as resp:
-            resp_body: Mapping[str, Any] = await resp.json()
-            reply = f' 반경 {m}미터에서 마스크 판매처를 {resp_body["count"]}군데 찾았어요.\n'
-            for store in resp_body['stores']:
-                if match := address_regex.match(store['addr']):
-                    address, abstract = match.groups()
-                else:
-                    address = store['addr']
-                    abstract = ''
-                
-                encoded_address = urlencode({'a': address + store['name']})
-                print(encoded_address)
-                reply_tmp = f'{store_type_desc[store["type"]]} [{store["name"]} ({abstract})](https://map.kakao.com/?q={encoded_address[2:]}): '
-                if store['remain_stat'] is None:
-                    reply_tmp += '❌ 정보 미제공\n'
-                    continue
-                reply_tmp += f'*{mask_stat_desc[store["remain_stat"]]}* '
-                reply_tmp += f'_({store["stock_at"]} 기준)_'
-                reply_tmp += '\n'
-                if len(reply_tmp) + len(reply) > 4096:
-                    reply += '판매처가 너무 많아요. 반경을 좁혀서 다시 시도해 주세요.\n'
-                    break
-                reply += reply_tmp
-        await message.reply(reply, parse_mode='Markdown', disable_web_page_preview=True)
+    tmp_msg = await bot.send_message(message.chat.id, '검색중이에요. 잠시 기다려주세요.', reply_to_message_id=message.message_id)
+    async def coro():
+        async with aiohttp.ClientSession() as sess:
+            async with sess.get(f'{MASK_API}/storesByGeo/json', params=body) as resp:
+                resp_body: Mapping[str, Any] = await resp.json()
+                reply = f'반경 *{m}*미터에서 마스크 판매처를 *{resp_body["count"]}*군데 찾았어요.\n'
+                if resp_body['count'] == 0:
+                    reply = '저런! 근처에 마스크 판매처가 존재하지 않아요.'
+                for store in resp_body['stores']:
+                    if match := address_regex.match(store['addr']):
+                        address, abstract = match.groups()
+                    else:
+                        address = store['addr']
+                        abstract = ''
+                    
+                    reply_tmp = f'{store_type_desc[store["type"]]} [{store["name"]} ({abstract})](https://map.kakao.com/?q={address} {store["name"]}): '
+                    print(store)
+                    if 'remain_stat' not in store.keys() or store['remain_stat'] is None:
+                        reply_tmp += '❌ 정보 미제공\n'
+                        continue
+                    reply_tmp += f'*{mask_stat_desc[store["remain_stat"]]}* '
+                    reply_tmp += f'_({store["stock_at"]} 기준)_'
+                    reply_tmp += '\n'
+                    if len(reply_tmp) + len(reply) > 4096:
+                        reply += '판매처가 너무 많아요. 반경을 좁혀서 다시 시도해 주세요.\n'
+                        break
+                    reply += reply_tmp
+                await bot.edit_message_text(chat_id=message.chat.id, message_id=tmp_msg.message_id, text=reply, parse_mode='Markdown', disable_web_page_preview=True)
+    ex = await asyncio.gather(coro(), return_exceptions=True)
+    if len(ex) > 0 and isinstance(ex[0], Exception):
+        logging.error(ex[0])
+        await bot.edit_message_text(chat_id=message.chat.id, message_id=tmp_msg.message_id, text='저런! 마스크 판매처 정보를 불러오는 데 실패했어요. 다시 시도해 주세요.')
     if rr_mid is not None:
         del store_range_info[rr_mid]
 
