@@ -68,6 +68,7 @@ async def send_welcome(message: types.Message):
 
 @dp.message_handler(commands=['lookup'])
 async def start_lookup(message: types.Message):
+    logging.info(f'Received message {message.text}')
     response = ''
     m_split = message.text.strip().split(' ')
     if len(m_split) == 1:
