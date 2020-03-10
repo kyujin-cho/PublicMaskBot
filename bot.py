@@ -49,17 +49,20 @@ async def send_welcome(message: types.Message):
 
 @dp.message_handler(commands=['lookup'])
 async def start_lookup(message: types.Message):
-    m_split = message.text.replace('/lookup', '').strip().split(' ')
+    response = ''
+    m_split = message.text.strip().split(' ')
     print(m_split)
-    if len(m_split) == 0:
+    if len(m_split) == 1:
         range_ = 500
     else:
         try:
-            range_ = t.ToInt(gte=1, lte=1000).check(m_split[0].strip())
+            range_ = t.ToInt(gte=1, lte=5000).check(m_split[1].strip())
         except t.DataError as e:
             print(e)
             range_ = 500
-    sent_message = await bot.send_message(message.from_user.id, '이 메세지의 답변 메세지로 현재 위치를 보내주세요.', reply_to_message_id=message.message_id)
+            response = '반경이 너무 크거나 작아요. 기본값인 500미터로 고정할게요.\n'
+        response += '이 메세지의 답변 메세지로 현재 위치를 보내주세요.'
+    sent_message = await bot.send_message(message.chat.id, response, reply_to_message_id=message.message_id)
     store_range_info[sent_message.message_id] = range_
 
 @dp.message_handler(content_types=ContentTypes.LOCATION)
