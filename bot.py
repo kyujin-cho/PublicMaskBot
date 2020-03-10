@@ -19,7 +19,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import asyncio
 import logging
 import os
+from pathlib import Path
+import pickle
 import re
+import signal
+import shutil
 from typing import MutableMapping, Mapping, Any
 from urllib.parse import urlencode
 
@@ -34,10 +38,12 @@ load_dotenv(verbose=True)
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 MASK_API = 'https://8oi9s0nnth.apigw.ntruss.com/corona19-masks/v1'
 
+address_regex = re.compile(r'^([^\(]+)\((.+)\)$')
+dumped_range_info_path = Path('./range.binary')
+
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
-address_regex = re.compile(r'^([^\(]+)\((.+)\)$')
 
 mask_stat_desc = {
     'empty': '⚫️ 1개 이하',
@@ -82,16 +88,18 @@ async def start_lookup(message: types.Message):
             response = '반경이 너무 크거나 작아요. 기본값인 500미터로 고정할게요.\n'
     response += '이 메세지의 답변 메세지로 현재 위치를 보내주세요.'
     sent_message = await bot.send_message(message.chat.id, response, reply_to_message_id=message.message_id)
-    store_range_info[sent_message.message_id] = range_
+    store_range_info[(sent_message.message_id,message.chat.id,)] = range_
 
 @dp.message_handler(content_types=ContentTypes.LOCATION)
 async def get_location(message: types.Message):
     rr_mid = None
-    if message.reply_to_message is not None and message.reply_to_message.message_id in store_range_info.keys():
-        rr_mid = message.reply_to_message.message_id
-        m = store_range_info[rr_mid]
-    else:
-        m = 500
+    m = 500
+    if message.reply_to_message is not None:
+        rep_msg = message.reply_to_message
+        _rr_mid = (rep_msg.message_id, rep_msg.chat.id,)
+        if _rr_mid in store_range_info.keys():
+            m = store_range_info[_rr_mid]
+            rr_mid = _rr_mid
     try:
         location: types.Location = LocationChecker().check(value=message)
     except t.DataError as e:
@@ -116,16 +124,16 @@ async def get_location(message: types.Message):
                     else:
                         address = store['addr']
                         abstract = ''
-                    
-                    reply_tmp = f'{store_type_desc[store["type"]]} [{store["name"]} ({abstract})](https://map.kakao.com/?q={address} {store["name"]}): '
+                    address = f'{address.split(",")[0]} {store["name"]}'.replace(',', ' ').replace(' ', '+')
+                    reply_tmp = f'{store_type_desc[store["type"]]} [{store["name"]} ({abstract})](https://map.kakao.com/?q={address}): '
                     if 'remain_stat' not in store.keys() or store['remain_stat'] is None:
                         reply_tmp += '❌ 정보 미제공\n'
                         continue
                     reply_tmp += f'*{mask_stat_desc[store["remain_stat"]]}* '
                     reply_tmp += f'_({store["stock_at"]} 기준)_'
                     reply_tmp += '\n'
-                    if len(reply_tmp) + len(reply) > 4096:
-                        reply += '판매처가 너무 많아요. 반경을 좁혀서 다시 시도해 주세요.\n'
+                    if len(reply_tmp) + len(reply) > (4096 - 33):
+                        reply += '판매처가 너무 많아서, 나머지 판매처의 출력은 생략했어요.\n'
                         break
                     reply += reply_tmp
                 await bot.edit_message_text(chat_id=message.chat.id, message_id=tmp_msg.message_id, text=reply, parse_mode='Markdown', disable_web_page_preview=True)
@@ -136,8 +144,26 @@ async def get_location(message: types.Message):
     if rr_mid is not None:
         del store_range_info[rr_mid]
 
+def dump_range_info(signum, frame):
+    with open(dumped_range_info_path, 'wb') as fw:
+        fw.write(pickle.dumps(store_range_info))
+    logging.info('Dumped info:')
+    logging.info(store_range_info)
+    exit(0)
+
 if __name__ == '__main__':
     if BOT_TOKEN is None:
-        print('Bot Token env not provided!')
+        logging.error('Bot Token env not provided!')
         exit(-1)
+    if dumped_range_info_path.exists():
+        try:
+            with open(dumped_range_info_path, 'rb') as fr:
+                store_range_info = pickle.loads(fr.read())
+            logging.info('Loaded info:')
+            logging.info(store_range_info)
+        except:
+            logging.warning('Failed recoving range info')
+        os.remove(dumped_range_info_path)
+    signal.signal(signal.SIGINT, dump_range_info)
+
     executor.start_polling(dp, skip_updates=True)

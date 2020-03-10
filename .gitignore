@@ -136,3 +136,4 @@ dmypy.json
 
 .vscode
 .python-version
+range.binary
