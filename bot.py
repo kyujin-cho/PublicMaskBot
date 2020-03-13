@@ -133,7 +133,7 @@ async def get_location(message: types.Message):
                         address = store['addr']
                         abstract = ''
                     address = (f'{address.split(",")[0]} {store["name"]}'
-                                .replace(',', ' ').replace(' ', '+'))
+                               .replace(',', ' ').replace(' ', '+'))
                     reply_tmp = (f'{store_type_desc[store["type"]]} [{store["name"]} ({abstract})]'
                                  f'(https://map.kakao.com/?q={address}): ')
                     if 'remain_stat' not in store.keys() or store['remain_stat'] is None:
@@ -176,7 +176,7 @@ if __name__ == '__main__':
                 store_range_info = pickle.loads(fr.read())
             logging.info('Loaded info:')
             logging.info(store_range_info)
-        except:
+        except Exception:
             logging.warning('Failed recoving range info')
         os.remove(dumped_range_info_path)
     signal.signal(signal.SIGINT, dump_range_info)
