@@ -23,9 +23,7 @@ from pathlib import Path
 import pickle
 import re
 import signal
-import shutil
-from typing import MutableMapping, Mapping, Any
-from urllib.parse import urlencode
+from typing import Mapping, Any
 
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ContentTypes
