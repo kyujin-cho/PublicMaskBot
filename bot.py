@@ -1,4 +1,5 @@
 '''
+
 Copyright (C) 2020 ~  Kyujin Cho
 
 This program is free software: you can redistribute it and/or modify
@@ -90,8 +91,10 @@ async def start_lookup(message: types.Message):
             range_ = 500
             response = '반경이 너무 크거나 작아요. 기본값인 500미터로 고정할게요.\n'
     response += '이 메세지의 답변 메세지로 현재 위치를 보내주세요.'
-    sent_message = await bot.send_message(message.chat.id, response, reply_to_message_id=message.message_id, reply_markup= types.ForceReply(selective=True))
-    store_range_info[(sent_message.message_id,message.chat.id,)] = range_
+    sent_message = await bot.send_message(message.chat.id, response,
+        reply_to_message_id=message.message_id, reply_markup=types.ForceReply(selective=True))
+    store_range_info[(sent_message.message_id, message.chat.id,)] = range_
+
 
 @dp.message_handler(content_types=ContentTypes.LOCATION)
 async def get_location(message: types.Message):
