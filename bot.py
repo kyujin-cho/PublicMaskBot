@@ -24,6 +24,7 @@ from pathlib import Path
 import pickle
 import re
 import signal
+import traceback
 from typing import Mapping, Any
 
 from aiogram import Bot, Dispatcher, executor, types
@@ -48,7 +49,8 @@ mask_stat_desc = {
     'empty': '⚫️ 1개 이하',
     'few': '🔴 2개 ~ 29개',
     'some': '🟡 30개 ~99개',
-    'plenty': '🟢 100개 이상'
+    'plenty': '🟢 100개 이상',
+    'break': '❌ 판매중지'
 }
 store_type_desc = {
     '01': '💊',
@@ -128,6 +130,7 @@ async def get_location(message: types.Message):
                 if resp_body['count'] == 0:
                     reply = '저런! 근처에 마스크 판매처가 존재하지 않아요.'
                 for store in resp_body['stores']:
+                    logging.info(store)
                     if match := address_regex.match(store['addr']):  # noqa
                         address, abstract = match.groups()
                     else:
@@ -140,13 +143,17 @@ async def get_location(message: types.Message):
                     if 'remain_stat' not in store.keys() or store['remain_stat'] is None:
                         reply_tmp += '❌ 정보 미제공\n'
                         continue
-                    reply_tmp += f'*{mask_stat_desc[store["remain_stat"]]}* '
+                    if desc := mask_stat_desc.get(store['remain_stat']):  # noqa
+                        reply_tmp += f'*{desc}*'
+                    else:
+                        reply_tmp += f'*{store["remain_stat"]}* '
                     reply_tmp += f'_({store["stock_at"]} 기준)_'
                     reply_tmp += '\n'
                     if len(reply_tmp) + len(reply) > (4096 - 33):
                         reply += '판매처가 너무 많아서, 나머지 판매처의 출력은 생략했어요.\n'
                         break
                     reply += reply_tmp
+                logging.info(reply)
                 await bot.edit_message_text(chat_id=message.chat.id, message_id=tmp_msg.message_id,
                                             text=reply, parse_mode='Markdown',
                                             disable_web_page_preview=True)
