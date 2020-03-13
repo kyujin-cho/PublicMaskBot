@@ -23,9 +23,7 @@ from pathlib import Path
 import pickle
 import re
 import signal
-import shutil
-from typing import MutableMapping, Mapping, Any
-from urllib.parse import urlencode
+from typing import Mapping, Any
 
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ContentTypes
@@ -58,19 +56,24 @@ store_type_desc = {
 }
 store_range_info = {}
 
+
 class LocationChecker(t.Trafaret):
     def check_and_return(self, value: types.Message) -> types.Location:
         if not type(value) == types.Message:
             return self._failure('Value is not a Message')
         if value.location is None:
             return self._failure('Message does not contain location info')
-        if not (33.0 <= value.location.latitude <= 43.0) or not (124.0 <= value.location.longitude <= 132.0):
+        if not (33.0 <= value.location.latitude <= 43.0) or \
+           not (124.0 <= value.location.longitude <= 132.0):
             return self._failure('공적 마스크 API에서 지원하지 않는 위치에요.')
         return value.location
 
+
 @dp.message_handler(commands=['start', 'help'])
 async def send_welcome(message: types.Message):
-    await message.reply('반갑습니다! 공적 마스크 위치를 알려주는 텔레그램 봇입니다. 현재 위치를 보내면 근처 500미터 이내의 마스크 판매처와 재고를 알려드립니다.')
+    await message.reply('반갑습니다! 공적 마스크 위치를 알려주는 텔레그램 봇입니다. '
+                        '현재 위치를 보내면 근처 500미터 이내의 마스크 판매처와 재고를 알려드립니다.')
+
 
 @dp.message_handler(commands=['lookup'])
 async def start_lookup(message: types.Message):
@@ -104,13 +107,15 @@ async def get_location(message: types.Message):
         location: types.Location = LocationChecker().check(value=message)
     except t.DataError as e:
         return await message.reply(e.error)
-    
+
     body = {
         'lat': str(location.latitude),
         'lng': str(location.longitude),
         'm': str(m)
     }
-    tmp_msg = await bot.send_message(message.chat.id, '검색중이에요. 잠시 기다려주세요.', reply_to_message_id=message.message_id)
+    tmp_msg = await bot.send_message(message.chat.id, '검색중이에요. 잠시 기다려주세요.',
+                                     reply_to_message_id=message.message_id)
+
     async def coro():
         async with aiohttp.ClientSession() as sess:
             async with sess.get(f'{MASK_API}/storesByGeo/json', params=body) as resp:
@@ -119,13 +124,15 @@ async def get_location(message: types.Message):
                 if resp_body['count'] == 0:
                     reply = '저런! 근처에 마스크 판매처가 존재하지 않아요.'
                 for store in resp_body['stores']:
-                    if match := address_regex.match(store['addr']):
+                    if match := address_regex.match(store['addr']):  # noqa
                         address, abstract = match.groups()
                     else:
                         address = store['addr']
                         abstract = ''
-                    address = f'{address.split(",")[0]} {store["name"]}'.replace(',', ' ').replace(' ', '+')
-                    reply_tmp = f'{store_type_desc[store["type"]]} [{store["name"]} ({abstract})](https://map.kakao.com/?q={address}): '
+                    address = (f'{address.split(",")[0]} {store["name"]}'
+                                .replace(',', ' ').replace(' ', '+'))
+                    reply_tmp = (f'{store_type_desc[store["type"]]} [{store["name"]} ({abstract})]'
+                                 f'(https://map.kakao.com/?q={address}): ')
                     if 'remain_stat' not in store.keys() or store['remain_stat'] is None:
                         reply_tmp += '❌ 정보 미제공\n'
                         continue
@@ -136,13 +143,17 @@ async def get_location(message: types.Message):
                         reply += '판매처가 너무 많아서, 나머지 판매처의 출력은 생략했어요.\n'
                         break
                     reply += reply_tmp
-                await bot.edit_message_text(chat_id=message.chat.id, message_id=tmp_msg.message_id, text=reply, parse_mode='Markdown', disable_web_page_preview=True)
+                await bot.edit_message_text(chat_id=message.chat.id, message_id=tmp_msg.message_id,
+                                            text=reply, parse_mode='Markdown',
+                                            disable_web_page_preview=True)
     ex = await asyncio.gather(coro(), return_exceptions=True)
     if len(ex) > 0 and isinstance(ex[0], Exception):
         logging.error(ex[0])
-        await bot.edit_message_text(chat_id=message.chat.id, message_id=tmp_msg.message_id, text='저런! 마스크 판매처 정보를 불러오는 데 실패했어요. 다시 시도해 주세요.')
+        await bot.edit_message_text(chat_id=message.chat.id, message_id=tmp_msg.message_id,
+                                    text='저런! 마스크 판매처 정보를 불러오는 데 실패했어요. 다시 시도해 주세요.')
     if rr_mid is not None:
         del store_range_info[rr_mid]
+
 
 def dump_range_info(signum, frame):
     with open(dumped_range_info_path, 'wb') as fw:
@@ -150,6 +161,7 @@ def dump_range_info(signum, frame):
     logging.info('Dumped info:')
     logging.info(store_range_info)
     exit(0)
+
 
 if __name__ == '__main__':
     if BOT_TOKEN is None:
